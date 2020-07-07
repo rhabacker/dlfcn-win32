@@ -6,7 +6,7 @@ CFLAGS = -Wall -O3 -fomit-frame-pointer -Isrc
 
 ifeq ($(BUILD_SHARED),yes)
 	TARGETS += libdl.dll
-	SHFLAGS += -Wl,--out-implib,libdl.dll.a -DSHARED
+	SHFLAGS += -Wl,--out-implib,libdl.dll.a -DDLFCN_WIN32_EXPORTS -DDLFCN_WIN32_SHARED
 	INSTALL += shared-install
 	TESTS   += test.exe
 endif

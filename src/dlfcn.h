@@ -28,8 +28,12 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) && defined(DLFCN_WIN32_SHARED)
 #if defined(DLFCN_WIN32_EXPORTS)
 #   define DLFCN_EXPORT __declspec(dllexport)
+#else
+#   define DLFCN_EXPORT __declspec(dllimport)
+#endif
 #else
 #   define DLFCN_EXPORT
 #endif

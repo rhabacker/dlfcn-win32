@@ -1,14 +1,19 @@
 set(headers dlfcn.h)
 set(sources dlfcn.c)
 
-if (BUILD_SHARED_LIBS)
-  add_definitions(-DSHARED)
-endif (BUILD_SHARED_LIBS)
 
 add_library(dl ${sources})
 
 # Correctly export the location of installed includes in the target
 target_include_directories(dl INTERFACE $<INSTALL_INTERFACE:include>)
+
+# export the functions
+target_compile_definitions(dl PRIVATE DLFCN_WIN32_EXPORTS)
+
+# set shared mode for compiling library and propagate mode to cmake clients
+if (BUILD_SHARED_LIBS)
+    target_compile_definitions(dl PUBLIC DLFCN_WIN32_SHARED)
+endif (BUILD_SHARED_LIBS)
 
 install (TARGETS dl EXPORT dlfcn-win32-targets
                     RUNTIME DESTINATION bin

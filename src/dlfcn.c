@@ -46,9 +46,6 @@
 #endif
 #endif
 
-#ifdef SHARED
-#define DLFCN_WIN32_EXPORTS
-#endif
 #define __USE_GNU
 #include "dlfcn.h"
 
@@ -217,6 +214,7 @@ static BOOL MyEnumProcessModules( HANDLE hProcess, HMODULE *lphModule, DWORD cb,
     return EnumProcessModulesPtr( hProcess, lphModule, cb, lpcbNeeded );
 }
 
+DLFCN_EXPORT
 void *dlopen( const char *file, int mode )
 {
     HMODULE hModule;
@@ -324,6 +322,7 @@ void *dlopen( const char *file, int mode )
     return (void *) hModule;
 }
 
+DLFCN_EXPORT
 int dlclose( void *handle )
 {
     HMODULE hModule = (HMODULE) handle;
@@ -348,6 +347,7 @@ int dlclose( void *handle )
 }
 
 __declspec(noinline) /* Needed for _ReturnAddress() */
+DLFCN_EXPORT
 void *dlsym( void *handle, const char *name )
 {
     FARPROC symbol;
@@ -455,6 +455,7 @@ end:
     return *(void **) (&symbol);
 }
 
+DLFCN_EXPORT
 char *dlerror( void )
 {
     /* If this is the second consecutive call to dlerror, return NULL */
@@ -598,6 +599,7 @@ static int getModuleInfo( const void *addr, Dl_info *info )
     return 0;
 }
 
+DLFCN_EXPORT
 int dladdr( void *addr, Dl_info *info )
 {
     void *iat_addr;
@@ -632,7 +634,7 @@ int dladdr( void *addr, Dl_info *info )
     return 1;
 }
 
-#ifdef SHARED
+#ifdef DLFCN_WIN32_SHARED
 BOOL WINAPI DllMain( HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved )
 {
     (void) hinstDLL;
