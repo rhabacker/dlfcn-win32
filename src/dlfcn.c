@@ -3,6 +3,7 @@
  * Copyright (c) 2007 Ramiro Polla
  * Copyright (c) 2015 Tiancheng "Timothy" Gu
  * Copyright (c) 2019 Pali Rohár <pali.rohar@gmail.com>
+ * Copyright (c) 2020 Ralf Habacker <ralf.habacker@freenet.de>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -48,6 +49,7 @@
 #ifdef SHARED
 #define DLFCN_WIN32_EXPORTS
 #endif
+#define __USE_GNU
 #include "dlfcn.h"
 
 /* Note:
@@ -465,6 +467,169 @@ char *dlerror( void )
     error_occurred = FALSE;
 
     return error_buffer;
+}
+
+/* taken from http://bandido.ch/programming/Import_Address_Table_Hooking.pdf */
+IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
+{
+    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)module;
+    if ( dosHeader->e_magic != 0x5A4D )
+        return NULL;
+    IMAGE_OPTIONAL_HEADER* optionalHeader = (IMAGE_OPTIONAL_HEADER*)
+        ((BYTE*)module + dosHeader->e_lfanew + 24);
+    if ( optionalHeader->Magic != IMAGE_NT_OPTIONAL_HDR_MAGIC )
+        return NULL;
+    if ( optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0 ||
+        optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress == 0 )
+        return NULL;
+    *size = optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+    return (IMAGE_IMPORT_DESCRIPTOR*)((BYTE*)module +
+        optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+}
+
+#ifdef _WIN64
+typedef ULONGLONG PointerType;
+#else
+typedef ULONG PointerType;
+#endif
+
+/*
+ * return symbol name for a given address
+ */
+char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, const void *addr )
+{
+    PointerType base = (PointerType)baseAddress;
+    for(int i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
+        PIMAGE_THUNK_DATA thunkILT = (PIMAGE_THUNK_DATA)(iid[i].Characteristics + base);
+        PIMAGE_THUNK_DATA thunkIAT = (PIMAGE_THUNK_DATA)(iid[i].FirstThunk + base);
+        for(; thunkILT->u1.AddressOfData != 0; thunkILT++, thunkIAT++) {
+            if (IMAGE_SNAP_BY_ORDINAL(thunkILT->u1.Ordinal))
+              continue;
+            if (thunkIAT->u1.Function != (PointerType)addr)
+              continue;
+            PIMAGE_IMPORT_BY_NAME nameData = (PIMAGE_IMPORT_BY_NAME)(thunkILT->u1.AddressOfData + base);
+            return nameData->Name;
+        }
+   }
+   return NULL;
+}
+
+/*
+ * Return adress from Image Allocation Table (iat), if
+ * the original address points to a thunk table entry.
+ */
+static void *getAddressFromIAT( const void *addr )
+{
+    const unsigned char *p = addr;
+    /* ...inline app code...
+     * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
+     * ...thunk table...
+     * 00401D82   $-FF25 4C204000 , JMP DWORD PTR DS:[40204C]  ;  KERNEL32.GetModuleHandleA
+     * ...memory address value of pointer...
+     * 40204C > FC 3D 57 7C   ;little endian pointer value
+     */
+    if( *p == 0xff && *(p+1) == 0x25 )
+    {
+        HMODULE module = GetModuleHandle( 0 );
+        DWORD size;
+        void* iat = getImportTable( module, &size );
+        if (!iat)
+            return NULL;
+#ifdef _WIN64
+        /* 0000000000401730 <dlsym>:
+         *    401730:	ff 25 ba 8c 00 00    	jmpq   *0x8cba(%rip)        # 40a3f0 <__imp_dlsym>
+         * 000000000040a3f0 <__imp_dlsym>:
+         *    40a3f0:	78 a7
+         *    40a3f2:	00 00
+         *    40a3f4:	00 00
+         */
+        ULONG offset = *(ULONG*)(p+2);
+        void *p0 = (void*)(p + 6 + offset);
+        void **p1 = p0;
+        //fprintf(stderr, "addr %p -> p0 %p p1 %p *p1 %p iat start %p end %p\n", addr, p0, p1, *p1, iat, iat+size);
+        if ( p1 < iat || p1 > iat + size )
+            return NULL;
+        //fprintf(stderr, "%p -> %p\n", addr, *p1);
+        return *p1;
+#else
+        void **p1 = (void *)( p+2 );
+        //fprintf(stderr, "addr %p -> p1 %p *p1 %p iat start %p end %p\n", addr, p1, *p1, iat, iat+size);
+        if ( *p1 < iat || *p1 > iat + size )
+            return NULL;
+        void **p2 = *p1;
+        //fprintf(stderr, "%p -> %p\n", addr, *p2);
+        return *p2;
+#endif
+    }
+    return NULL;
+}
+
+/* holds module filename */
+static char _module_filename[2*MAX_PATH];
+
+/**
+ * Get module information (filename and base address) from the address given
+ * @param addr address to get module info for
+ * @param info pointer to store module info
+ * @return 0 requested info filled into structure pointed by parameter info
+ * @return 1 error
+ */
+static int getModuleInfo( const void *addr, Dl_info *info )
+{
+    HMODULE hModule;
+    int sLen;
+
+    if (!GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule))
+        return 1;
+
+    if( !hModule )
+    {
+        return 1;
+    }
+
+    info->dli_fbase = (void *)hModule;
+
+    sLen = GetModuleFileNameA( hModule, _module_filename, sizeof( _module_filename ) );
+    if( sLen == 0 )
+        return 1;
+    if( sLen == sizeof( _module_filename ) && GetLastError() == ERROR_INSUFFICIENT_BUFFER )
+        return 1;
+    info->dli_fname = _module_filename;
+    return 0;
+}
+
+int dladdr( const void *addr, Dl_info *info )
+{
+    void *iat_addr;
+    const void *real_addr;
+
+    if( !info )
+        return 0;
+
+    iat_addr = getAddressFromIAT( addr );
+    real_addr = iat_addr ? iat_addr : addr;
+    if( getModuleInfo( real_addr, info ))
+    {
+        info->dli_fname = NULL;
+        info->dli_fbase = NULL;
+        info->dli_saddr = NULL;
+    }
+    else
+    {
+        info->dli_saddr = (void*)real_addr;
+        HMODULE module = GetModuleHandle( 0 );
+        DWORD size;
+        void* iat = getImportTable( module, &size );
+        if (iat) {
+            const char *sym = getSymbolName( module, iat, real_addr );
+            if (sym) {
+                info->dli_sname = sym;
+                return 1;
+            }
+        }
+    }
+    info->dli_sname = NULL;
+    return 1;
 }
 
 #ifdef SHARED
