@@ -10,3 +10,6 @@ set_target_properties(testdll3 PROPERTIES PREFIX "")
 add_executable(t_dlfcn test.c)
 target_link_libraries(t_dlfcn dl)
 add_test (NAME t_dlfcn COMMAND t_dlfcn)
+
+add_executable(test-dladdr test-dladdr.c)
+target_link_libraries(test-dladdr dl)
