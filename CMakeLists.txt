@@ -9,7 +9,9 @@ project (dlfcn-win32 C)
 option(BUILD_SHARED_LIBS "shared/static libs" ON) 
 option(BUILD_TESTS "tests?" OFF)
 
-add_subdirectory(src)
+if(WIN32)
+    add_subdirectory(src)
+endif()
 
 if (BUILD_TESTS)
   add_subdirectory(tests)
