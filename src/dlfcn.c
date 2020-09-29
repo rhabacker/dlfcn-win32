@@ -496,7 +496,7 @@ typedef ULONG PointerType;
 /*
  * return symbol name for a given address
  */
-char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, const void *addr )
+char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
     PointerType base = (PointerType)baseAddress;
     for(int i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
@@ -518,9 +518,9 @@ char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, const vo
  * Return adress from Image Allocation Table (iat), if
  * the original address points to a thunk table entry.
  */
-static void *getAddressFromIAT( const void *addr )
+static unsigned char *getAddressFromIAT( unsigned char *addr )
 {
-    const unsigned char *p = addr;
+    BYTE *p = (unsigned char *)addr;
     /* ...inline app code...
      * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
      * ...thunk table...
@@ -532,7 +532,7 @@ static void *getAddressFromIAT( const void *addr )
     {
         HMODULE module = GetModuleHandle( 0 );
         DWORD size;
-        void* iat = getImportTable( module, &size );
+        BYTE* iat = (BYTE *)getImportTable( module, &size );
         if (!iat)
             return NULL;
 #ifdef _WIN64
@@ -544,19 +544,19 @@ static void *getAddressFromIAT( const void *addr )
          *    40a3f4:	00 00
          */
         ULONG offset = *(ULONG*)(p+2);
-        void *p0 = (void*)(p + 6 + offset);
-        void **p1 = p0;
+        BYTE *p0 = (void *)(p + 6 + offset);
+        BYTE **p1 = p0;
         //fprintf(stderr, "addr %p -> p0 %p p1 %p *p1 %p iat start %p end %p\n", addr, p0, p1, *p1, iat, iat+size);
         if ( p1 < iat || p1 > iat + size )
             return NULL;
         //fprintf(stderr, "%p -> %p\n", addr, *p1);
         return *p1;
 #else
-        void **p1 = (void *)( p+2 );
+        BYTE **p1 = (void *)( p+2 );
         //fprintf(stderr, "addr %p -> p1 %p *p1 %p iat start %p end %p\n", addr, p1, *p1, iat, iat+size);
         if ( *p1 < iat || *p1 > iat + size )
             return NULL;
-        void **p2 = *p1;
+        BYTE **p2 = (void *)*p1;
         //fprintf(stderr, "%p -> %p\n", addr, *p2);
         return *p2;
 #endif
@@ -577,7 +577,7 @@ static char _module_filename[2*MAX_PATH];
 static int getModuleInfo( const void *addr, Dl_info *info )
 {
     HMODULE hModule;
-    int sLen;
+    DWORD sLen;
 
     if (!GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule))
         return 1;
@@ -598,10 +598,10 @@ static int getModuleInfo( const void *addr, Dl_info *info )
     return 0;
 }
 
-int dladdr( const void *addr, Dl_info *info )
+int dladdr( void *addr, Dl_info *info )
 {
     void *iat_addr;
-    const void *real_addr;
+    void *real_addr;
 
     if( !info )
         return 0;
@@ -621,7 +621,7 @@ int dladdr( const void *addr, Dl_info *info )
         DWORD size;
         void* iat = getImportTable( module, &size );
         if (iat) {
-            const char *sym = getSymbolName( module, iat, real_addr );
+            char *sym = getSymbolName( module, iat, real_addr );
             if (sym) {
                 info->dli_sname = sym;
                 return 1;
