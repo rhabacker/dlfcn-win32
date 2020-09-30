@@ -33,7 +33,7 @@ void print_dl_info(Dl_info *info)
 int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
 {
     Dl_info info;
-    int  result = dladdr( addr, &info );
+    int result = dladdr( addr, &info );
     int passed = 0;
     if (!result)
     {
@@ -41,6 +41,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
         printf( "check address %p which has symbol '%s' -> %s\n", addr, addrsym, passed ? "passed" : "failed" );
         if (verbose)
             fprintf( stderr,"could not get symbol information for address %p\n", addr );
+        return !passed;
     }
     else
     {
@@ -52,8 +53,8 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
         printf( "check address %p with has symbol '%s' -> %s\n",addr, addrsym, passed ? "passed" : "failed" );
         if (verbose)
             print_dl_info( &info );
+        return !passed;
     }
-    return !result;
 }
 
 /**
@@ -159,5 +160,5 @@ int main(int argc, char **argv)
     result |= check_dladdr ( (void*)LoadLibraryExA, "LoadLibraryExA", Pass );
     result |= check_dladdr_by_dlopen( "kernel32.dll", "LoadLibraryExA", Pass );
 #endif
-   return result;
+    return result;
 }
