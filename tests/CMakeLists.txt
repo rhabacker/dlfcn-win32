@@ -15,3 +15,4 @@ endif()
 
 add_executable(test-dladdr test-dladdr.c)
 target_link_libraries(test-dladdr dl)
+add_test (NAME test-dladdr COMMAND test-dladdr)
