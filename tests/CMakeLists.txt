@@ -1,4 +1,3 @@
-enable_testing()
 if(WIN32)
     include_directories(../src)
     add_library(testdll SHARED testdll.c)
