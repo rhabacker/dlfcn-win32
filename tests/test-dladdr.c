@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <string.h>
+
+/* required for non Windows builds */
+#define __USE_GNU
 #include <dlfcn.h>
 
 static int verbose = 0;
