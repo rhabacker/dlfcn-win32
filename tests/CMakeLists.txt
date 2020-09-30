@@ -1,6 +1,6 @@
 enable_testing()
-include_directories(../src)
 if(WIN32)
+    include_directories(../src)
     add_library(testdll SHARED testdll.c)
     set_target_properties(testdll PROPERTIES PREFIX "")
     add_library(testdll2 SHARED testdll2.c)
