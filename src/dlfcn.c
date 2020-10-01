@@ -47,6 +47,9 @@
 #endif
 
 #define __USE_GNU
+#ifdef DLFCN_WIN32_SHARED
+#define DLFCN_WIN32_EXPORTS
+#endif
 #include "dlfcn.h"
 
 /* Note:

@@ -7,8 +7,8 @@ add_library(dl ${sources})
 # Correctly export the location of installed includes in the target
 target_include_directories(dl INTERFACE $<INSTALL_INTERFACE:include>)
 
-# export the functions
-target_compile_definitions(dl PRIVATE DLFCN_WIN32_EXPORTS)
+# dot not add -D<target>_EXPORTS
+set_target_properties(dl PROPERTIES DEFINE_SYMBOL "")
 
 # set shared mode for compiling library and propagate mode to cmake clients
 if (BUILD_SHARED_LIBS)
