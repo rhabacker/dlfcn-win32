@@ -571,31 +571,31 @@ static char _module_filename[2*MAX_PATH];
  * Get module information (filename and base address) from the address given
  * @param addr address to get module info for
  * @param info pointer to store module info
- * @return 0 requested info filled into structure pointed by parameter info
- * @return 1 error
+ * @return TRUE requested info filled into structure pointed by parameter info
+ * @return FALSE error
  */
-static int getModuleInfo( const void *addr, Dl_info *info )
+static BOOL getModuleInfo( const void *addr, Dl_info *info )
 {
     HMODULE hModule;
     DWORD sLen;
 
     if (!GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule))
-        return 1;
+        return FALSE;
 
     if( !hModule )
     {
-        return 1;
+        return FALSE;
     }
 
     info->dli_fbase = (void *)hModule;
 
     sLen = GetModuleFileNameA( hModule, _module_filename, sizeof( _module_filename ) );
     if( sLen == 0 )
-        return 1;
+        return FALSE;
     if( sLen == sizeof( _module_filename ) && GetLastError() == ERROR_INSUFFICIENT_BUFFER )
-        return 1;
+        return FALSE;
     info->dli_fname = _module_filename;
-    return 0;
+    return TRUE;
 }
 
 DLFCN_EXPORT
@@ -609,7 +609,7 @@ int dladdr( void *addr, Dl_info *info )
 
     iat_addr = getAddressFromIAT( addr );
     real_addr = iat_addr ? iat_addr : addr;
-    if( getModuleInfo( real_addr, info ))
+    if( !getModuleInfo( real_addr, info ))
     {
         info->dli_fname = NULL;
         info->dli_fbase = NULL;
