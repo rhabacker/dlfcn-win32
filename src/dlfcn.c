@@ -529,40 +529,39 @@ static unsigned char *getAddressFromIAT( unsigned char *addr )
      * ...memory address value of pointer...
      * 40204C > FC 3D 57 7C   ;little endian pointer value
      */
-    if( *p == 0xff && *(p+1) == 0x25 )
-    {
-        HMODULE module = GetModuleHandle( 0 );
-        DWORD size;
-        BYTE* iat = (BYTE *)getImportTable( module, &size );
-        if (!iat)
-            return NULL;
+    if( p[0] != 0xff || p[1] != 0x25 )
+        return NULL;
+
+    HMODULE module = GetModuleHandle( 0 );
+    DWORD size;
+    BYTE* iat = (BYTE *)getImportTable( module, &size );
+    if (!iat)
+        return NULL;
 #ifdef _WIN64
-        /* 0000000000401730 <dlsym>:
-         *    401730:	ff 25 ba 8c 00 00    	jmpq   *0x8cba(%rip)        # 40a3f0 <__imp_dlsym>
-         * 000000000040a3f0 <__imp_dlsym>:
-         *    40a3f0:	78 a7
-         *    40a3f2:	00 00
-         *    40a3f4:	00 00
-         */
-        ULONG offset = *(ULONG*)(p+2);
-        BYTE *p0 = (void *)(p + 6 + offset);
-        BYTE **p1 = p0;
-        //fprintf(stderr, "addr %p -> p0 %p p1 %p *p1 %p iat start %p end %p\n", addr, p0, p1, *p1, iat, iat+size);
-        if ( p1 < iat || p1 > iat + size )
-            return NULL;
-        //fprintf(stderr, "%p -> %p\n", addr, *p1);
-        return *p1;
+    /* 0000000000401730 <dlsym>:
+     *    401730:	ff 25 ba 8c 00 00    	jmpq   *0x8cba(%rip)        # 40a3f0 <__imp_dlsym>
+     * 000000000040a3f0 <__imp_dlsym>:
+     *    40a3f0:	78 a7
+     *    40a3f2:	00 00
+     *    40a3f4:	00 00
+     */
+    ULONG offset = *(ULONG*)(p+2);
+    BYTE *p0 = (void *)(p + 6 + offset);
+    BYTE **p1 = p0;
+    //fprintf(stderr, "addr %p -> p0 %p p1 %p *p1 %p iat start %p end %p\n", addr, p0, p1, *p1, iat, iat+size);
+    if ( p1 < iat || p1 > iat + size )
+        return NULL;
+    //fprintf(stderr, "%p -> %p\n", addr, *p1);
+    return *p1;
 #else
-        BYTE **p1 = (void *)( p+2 );
-        //fprintf(stderr, "addr %p -> p1 %p *p1 %p iat start %p end %p\n", addr, p1, *p1, iat, iat+size);
-        if ( *p1 < iat || *p1 > iat + size )
-            return NULL;
-        BYTE **p2 = (void *)*p1;
-        //fprintf(stderr, "%p -> %p\n", addr, *p2);
-        return *p2;
+    BYTE **p1 = (void *)( p+2 );
+    //fprintf(stderr, "addr %p -> p1 %p *p1 %p iat start %p end %p\n", addr, p1, *p1, iat, iat+size);
+    if ( *p1 < iat || *p1 > iat + size )
+        return NULL;
+    BYTE **p2 = (void *)*p1;
+    //fprintf(stderr, "%p -> %p\n", addr, *p2);
+    return *p2;
 #endif
-    }
-    return NULL;
 }
 
 /* holds module filename */
