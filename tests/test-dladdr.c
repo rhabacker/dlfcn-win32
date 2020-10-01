@@ -9,6 +9,7 @@ static int verbose = 0;
 
 typedef enum {
     Pass = 1,
+    PassWithoutSymbol = 2,
     Fail = 0,
     NoInfo = -1,
 } ExpectedResult;
@@ -45,6 +46,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
         int sym_match  = info.dli_sname && strcmp( addrsym, info.dli_sname ) == 0;
         int addr_match  = addr == info.dli_saddr;
         passed = (expected_result == Pass && sym_match && addr_match)
+                 || (expected_result == PassWithoutSymbol && addr_match)
                  || (expected_result == Fail && !(sym_match && addr_match));
         printf( "check address %p with has symbol '%s' -> %s\n",addr, addrsym, passed ? "passed" : "failed" );
         if (verbose)
@@ -113,6 +115,9 @@ HMODULE STDCALL GetModuleHandleA (LPCSTR lpModuleName);
 /* link to directly to iat */
 __declspec(dllimport) HMODULE STDCALL LoadLibraryExA (LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 SIZE_T STDCALL VirtualQuery (LPCVOID lpAddress, LPCVOID lpBuffer, SIZE_T dwLength);
+#define PassWithoutSymbolOnWin PassWithoutSymbol
+#else
+#define PassWithoutSymbolOnWin Pass
 #endif
 
 
@@ -126,9 +131,9 @@ int main(int argc, char **argv)
     /* -ldl */
     result |= check_dladdr( (void*)dlopen, "dlopen", Pass );
     /* -lglibc */
-    result |= check_dladdr( (void*)vsnprintf, "vsnprintf", Pass );
+    result |= check_dladdr( (void*)vsnprintf, "vsnprintf", PassWithoutSymbolOnWin );
     /* test-dladdr */
-    result |= check_dladdr( (void*)main, "main", Pass );
+    result |= check_dladdr( (void*)main, "main", PassWithoutSymbolOnWin );
     /* offsets */
     result |= check_dladdr( (char*)dladdr-6, "dladdr-6", Fail );
     /* offsets */
