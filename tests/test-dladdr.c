@@ -139,7 +139,7 @@ int main(int argc, char **argv)
     /* offsets */
     result |= check_dladdr( (char*)dladdr+6, "dladdr+6", Fail );
     /* invalid address */
-    unsigned char buffer[2] = "\xFF\x25";
+    unsigned char buffer[6] = "\xFF\x25\x00\x00\x00\x00";
     result |= check_dladdr( buffer, "invalid", NoInfo );
 
 #ifdef _WIN32
