@@ -102,11 +102,17 @@ int check_dladdr_by_dlopen( char *libname, char *sym, int should_match )
 #define DWORD long
 #define SIZE_T long
 
+#ifdef _MSC_VER
+#define STDCALL __stdcall
+#else
+#define STDCALL __attribute__((__stdcall__))
+#endif
+
 /* link to import thunk */
-HMODULE __attribute__((__stdcall__)) GetModuleHandleA (LPCSTR lpModuleName);
+HMODULE STDCALL GetModuleHandleA (LPCSTR lpModuleName);
 /* link to directly to iat */
-__declspec(dllimport) HMODULE __attribute__((__stdcall__)) LoadLibraryExA (LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
-SIZE_T __attribute__((__stdcall__))  VirtualQuery (LPCVOID lpAddress, LPCVOID lpBuffer, SIZE_T dwLength);
+__declspec(dllimport) HMODULE STDCALL LoadLibraryExA (LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+SIZE_T STDCALL VirtualQuery (LPCVOID lpAddress, LPCVOID lpBuffer, SIZE_T dwLength);
 #endif
 
 
