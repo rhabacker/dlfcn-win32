@@ -523,7 +523,6 @@ char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *ad
  */
 static unsigned char *getAddressFromIAT( unsigned char *addr )
 {
-    BYTE *p = (unsigned char *)addr;
     /* ...inline app code...
      * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
      * ...thunk table...
@@ -531,39 +530,32 @@ static unsigned char *getAddressFromIAT( unsigned char *addr )
      * ...memory address value of pointer...
      * 40204C > FC 3D 57 7C   ;little endian pointer value
      */
-    if( p[0] != 0xff || p[1] != 0x25 )
+    if( addr[0] != 0xff || addr[1] != 0x25 )
         return NULL;
 
     HMODULE module = GetModuleHandle( 0 );
     DWORD size;
-    BYTE* iat = (BYTE *)getImportTable( module, &size );
+    void **iat = (void **)getImportTable( module, &size );
     if (!iat)
         return NULL;
-#ifdef _WIN64
-    /* 0000000000401730 <dlsym>:
-     *    401730:	ff 25 ba 8c 00 00    	jmpq   *0x8cba(%rip)        # 40a3f0 <__imp_dlsym>
-     * 000000000040a3f0 <__imp_dlsym>:
-     *    40a3f0:	78 a7
-     *    40a3f2:	00 00
-     *    40a3f4:	00 00
+    /* get offset from thunk table (after instruction 0xff 0x25)
+     *   4018c8 <_VirtualQuery>: ff 25 4a 8a 00 00
      */
-    ULONG offset = *(ULONG*)(p+2);
-    BYTE *p0 = (void *)(p + 6 + offset);
-    BYTE **p1 = p0;
-    //fprintf(stderr, "addr %p -> p0 %p p1 %p *p1 %p iat start %p end %p\n", addr, p0, p1, *p1, iat, iat+size);
-    if ( p1 < iat || p1 > iat + size )
-        return NULL;
-    //fprintf(stderr, "%p -> %p\n", addr, *p1);
-    return *p1;
+    ULONG offset = *(ULONG*)(addr+2);
+#ifdef _WIN64
+    /* On 64 bit the offset is relative
+     *   4018c8:	ff 25 4a 8a 00 00    	jmpq   *0x8a4a(%rip)        # 40a318 <__imp_VirtualQuery> # (64bit)
+     */
+    void **ptr = (void *)(addr + 6 + offset);
 #else
-    BYTE **p1 = (void *)( p+2 );
-    //fprintf(stderr, "addr %p -> p1 %p *p1 %p iat start %p end %p\n", addr, p1, *p1, iat, iat+size);
-    if ( *p1 < iat || *p1 > iat + size )
-        return NULL;
-    BYTE **p2 = (void *)*p1;
-    //fprintf(stderr, "%p -> %p\n", addr, *p2);
-    return *p2;
+    /* On 32 bit the offset is absolute
+     *    4019b4:	ff 25 90 71 40 00    	jmp    *0x40719
+     */
+    void **ptr = (void *)offset;
 #endif
+    if( ptr < iat || ptr > iat + size )
+        return NULL;
+    return *ptr;
 }
 
 /* holds module filename */
