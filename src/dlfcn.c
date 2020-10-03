@@ -473,7 +473,7 @@ char *dlerror( void )
 }
 
 /* taken from http://bandido.ch/programming/Import_Address_Table_Hooking.pdf */
-IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
+static IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
 {
     IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)module;
     if ( dosHeader->e_magic != 0x5A4D )
@@ -499,7 +499,7 @@ typedef ULONG PointerType;
 /*
  * return symbol name for a given address
  */
-char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
+static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
     PointerType base = (PointerType)baseAddress;
     for(int i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
