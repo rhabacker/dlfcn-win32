@@ -490,25 +490,19 @@ static IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
         optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 }
 
-#ifdef _WIN64
-typedef ULONGLONG PointerType;
-#else
-typedef ULONG PointerType;
-#endif
-
 /*
  * return symbol name for a given address
  */
 static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
-    PointerType base = (PointerType)baseAddress;
+    void *base = baseAddress;
     for(int i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
         PIMAGE_THUNK_DATA thunkILT = (PIMAGE_THUNK_DATA)(iid[i].Characteristics + base);
         PIMAGE_THUNK_DATA thunkIAT = (PIMAGE_THUNK_DATA)(iid[i].FirstThunk + base);
         for(; thunkILT->u1.AddressOfData != 0; thunkILT++, thunkIAT++) {
             if (IMAGE_SNAP_BY_ORDINAL(thunkILT->u1.Ordinal))
               continue;
-            if (thunkIAT->u1.Function != (PointerType)addr)
+            if ((void *)thunkIAT->u1.Function != addr)
               continue;
             PIMAGE_IMPORT_BY_NAME nameData = (PIMAGE_IMPORT_BY_NAME)(thunkILT->u1.AddressOfData + base);
             return nameData->Name;
