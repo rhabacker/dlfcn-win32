@@ -496,7 +496,8 @@ static IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
 static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
     void *base = baseAddress;
-    for(int i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
+    int i;
+    for(i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
         PIMAGE_THUNK_DATA thunkILT = (PIMAGE_THUNK_DATA)(iid[i].Characteristics + base);
         PIMAGE_THUNK_DATA thunkIAT = (PIMAGE_THUNK_DATA)(iid[i].FirstThunk + base);
         for(; thunkILT->u1.AddressOfData != 0; thunkILT++, thunkIAT++) {
