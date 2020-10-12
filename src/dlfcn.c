@@ -516,7 +516,7 @@ static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, v
  * Return adress from Image Allocation Table (iat), if
  * the original address points to a thunk table entry.
  */
-static unsigned char *getAddressFromIAT( unsigned char *addr )
+static unsigned char *getAddressFromIAT( void *addr )
 {
     /* ...inline app code...
      * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
@@ -525,7 +525,7 @@ static unsigned char *getAddressFromIAT( unsigned char *addr )
      * ...memory address value of pointer...
      * 40204C > FC 3D 57 7C   ;little endian pointer value
      */
-    if( addr[0] != 0xff || addr[1] != 0x25 )
+    if( *(short *)addr != 0x25ff )
         return NULL;
 
     HMODULE module = GetModuleHandle( 0 );
