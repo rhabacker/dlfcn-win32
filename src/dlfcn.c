@@ -516,7 +516,7 @@ static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, v
  * Return adress from Image Allocation Table (iat), if
  * the original address points to a thunk table entry.
  */
-static unsigned char *getAddressFromIAT( void *addr )
+static unsigned char *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 {
     /* ...inline app code...
      * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
@@ -528,11 +528,6 @@ static unsigned char *getAddressFromIAT( void *addr )
     if( *(short *)addr != 0x25ff )
         return NULL;
 
-    HMODULE module = GetModuleHandle( 0 );
-    DWORD size;
-    void **iat = (void **)getImportTable( module, &size );
-    if (!iat)
-        return NULL;
     /* get offset from thunk table (after instruction 0xff 0x25)
      *   4018c8 <_VirtualQuery>: ff 25 4a 8a 00 00
      */
@@ -548,7 +543,7 @@ static unsigned char *getAddressFromIAT( void *addr )
      */
     void **ptr = (void *)offset;
 #endif
-    if( ptr < iat || ptr > iat + size )
+    if( ptr < (void**)iat || ptr > (void**)iat + iat_size )
         return NULL;
     return *ptr;
 }
@@ -590,13 +585,19 @@ static BOOL getModuleInfo( const void *addr, Dl_info *info )
 DLFCN_EXPORT
 int dladdr( void *addr, Dl_info *info )
 {
-    void *iat_addr;
+    void *iat_addr = NULL;
     void *real_addr;
+    HMODULE module;
+    IMAGE_IMPORT_DESCRIPTOR *iat;
+    DWORD size = 0;
 
     if( !info )
         return 0;
 
-    iat_addr = getAddressFromIAT( addr );
+    module = GetModuleHandle( 0 );
+    iat = getImportTable( module, &size );
+    if( iat )
+        iat_addr = getAddressFromIAT( iat, size, addr );
     real_addr = iat_addr ? iat_addr : addr;
     if( !getModuleInfo( real_addr, info ))
     {
@@ -607,9 +608,6 @@ int dladdr( void *addr, Dl_info *info )
     else
     {
         info->dli_saddr = (void*)real_addr;
-        HMODULE module = GetModuleHandle( 0 );
-        DWORD size;
-        void* iat = getImportTable( module, &size );
         if (iat) {
             char *sym = getSymbolName( module, iat, real_addr );
             if (sym) {
