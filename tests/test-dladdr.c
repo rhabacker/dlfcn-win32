@@ -123,11 +123,16 @@ SIZE_T STDCALL VirtualQuery (LPCVOID lpAddress, LPCVOID lpBuffer, SIZE_T dwLengt
 
 int main(int argc, char **argv)
 {
+    int  result = 0;
     if (argc == 2)
         verbose = 1;
 
+    /* null pointer */
+    result = check_dladdr((void*)0, "null" , NoInfo);
+    /* invalid pointer */
+    result |= check_dladdr((void*)0x125, "invalid pointer" , Fail);
     /* -ldl */
-    int  result = check_dladdr( ((void*)dladdr), "dladdr" , Pass );
+    result |= check_dladdr( ((void*)dladdr), "dladdr" , Pass );
     /* -ldl */
     result |= check_dladdr( (void*)dlopen, "dlopen", Pass );
     /* -lglibc */
@@ -138,9 +143,9 @@ int main(int argc, char **argv)
     result |= check_dladdr( (char*)dladdr-6, "dladdr-6", Fail );
     /* offsets */
     result |= check_dladdr( (char*)dladdr+6, "dladdr+6", Fail );
-    /* invalid address */
+    /* invalid address on import thunk */
     unsigned char buffer[6] = "\xFF\x25\x00\x00\x00\x00";
-    result |= check_dladdr( buffer, "invalid", NoInfo );
+    result |= check_dladdr( buffer, "invalid import thunk", NoInfo );
 
 #ifdef _WIN32
     /* last entry in iat */
