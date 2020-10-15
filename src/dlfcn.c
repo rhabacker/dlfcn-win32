@@ -518,6 +518,12 @@ static char *getSymbolName( HMODULE baseAddress, IMAGE_IMPORT_DESCRIPTOR *iid, v
  */
 static unsigned char *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 {
+    /* check valid pointer */
+    MEMORY_BASIC_INFORMATION info;
+    SIZE_T result = VirtualQuery( addr, &info, sizeof( info ));
+    if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 )
+        return NULL;
+
     /* ...inline app code...
      * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
      * ...thunk table...
@@ -591,7 +597,7 @@ int dladdr( void *addr, Dl_info *info )
     IMAGE_IMPORT_DESCRIPTOR *iat;
     DWORD size = 0;
 
-    if( !info )
+    if( !info || !addr )
         return 0;
 
     module = GetModuleHandle( 0 );
