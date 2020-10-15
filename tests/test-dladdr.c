@@ -1,9 +1,10 @@
+/* required for non Windows builds, must be set in front of the first system include */
+#define _GNU_SOURCE
+
+#include <dlfcn.h>
+
 #include <stdio.h>
 #include <string.h>
-
-/* required for non Windows builds */
-#define __USE_GNU
-#include <dlfcn.h>
 
 static int verbose = 0;
 
