@@ -515,7 +515,7 @@ static char *getSymbolName( void *base, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr
  * Return adress from Image Allocation Table (iat), if
  * the original address points to a thunk table entry.
  */
-static unsigned char *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
+static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 {
     /* check valid pointer */
     MEMORY_BASIC_INFORMATION info;
