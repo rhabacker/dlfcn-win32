@@ -520,8 +520,8 @@ static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 {
     /* check valid pointer */
     MEMORY_BASIC_INFORMATION info;
-    SIZE_T result = VirtualQuery( addr, &info, sizeof( info ));
-    if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 )
+    SIZE_T result = VirtualQuery( addr, &info, sizeof( info ) );
+    if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 || info.AllocationProtect == PAGE_NOACCESS )
         return NULL;
 
     /* ...inline app code...
