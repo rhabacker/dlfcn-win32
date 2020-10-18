@@ -560,7 +560,7 @@ static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
 }
 
 /* holds module filename */
-static char _module_filename[2*MAX_PATH];
+static char module_filename[2*MAX_PATH];
 
 static void fill_module_info( void *addr, Dl_info *info )
 {
@@ -576,9 +576,9 @@ static void fill_module_info( void *addr, Dl_info *info )
 
     info->dli_fbase = (void *) hModule;
 
-    dwSize = GetModuleFileNameA( hModule, _module_filename, sizeof( _module_filename ) );
-    if( dwSize > 0 && dwSize < sizeof( _module_filename ) )
-        info->dli_fname = _module_filename;
+    dwSize = GetModuleFileNameA( hModule, module_filename, sizeof( module_filename ) );
+    if( dwSize > 0 && dwSize < sizeof( module_filename ) )
+        info->dli_fname = module_filename;
     else
         info->dli_fname = NULL;
 }
