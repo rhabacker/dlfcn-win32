@@ -531,18 +531,20 @@ static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
      * ...memory address value of pointer...
      * 40204C > FC 3D 57 7C   ;little endian pointer value
      */
-    if( *(short *)addr != 0x25ff )
+
+    BYTE *thkp = (BYTE*)addr;
+    if( thkp[0] != 0xff || thkp[1] != 0x25 )
         return NULL;
 
     /* get offset from thunk table (after instruction 0xff 0x25)
      *   4018c8 <_VirtualQuery>: ff 25 4a 8a 00 00
      */
-    ULONG offset = *(ULONG*)(addr+2);
+    ULONG offset = *(ULONG*)(thkp + 2);
 #ifdef _WIN64
     /* On 64 bit the offset is relative
      *   4018c8:	ff 25 4a 8a 00 00    	jmpq   *0x8a4a(%rip)        # 40a318 <__imp_VirtualQuery> # (64bit)
      */
-    void **ptr = (void *)(addr + 6 + offset);
+    void **ptr = (void *)(thkp + 6 + offset);
 #else
     /* On 32 bit the offset is absolute
      *    4019b4:	ff 25 90 71 40 00    	jmp    *0x40719
