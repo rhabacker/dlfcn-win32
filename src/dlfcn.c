@@ -562,72 +562,55 @@ static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 /* holds module filename */
 static char _module_filename[2*MAX_PATH];
 
-/**
- * Get module information (filename and base address) from the address given
- * @param addr address to get module info for
- * @param info pointer to store module info
- * @return TRUE requested info filled into structure pointed by parameter info
- * @return FALSE error
- */
-static BOOL getModuleInfo( const void *addr, Dl_info *info )
+static void fillModuleInfo( void *addr, Dl_info *info )
 {
     HMODULE hModule;
-    DWORD sLen;
+    DWORD dwSize;
 
-    if (!GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule))
-        return FALSE;
-
-    if( !hModule )
+    if( !GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule ) || !hModule )
     {
-        return FALSE;
+        info->dli_fname = NULL;
+        info->dli_fbase = NULL;
+        return;
     }
 
-    info->dli_fbase = (void *)hModule;
+    info->dli_fbase = (void *) hModule;
 
-    sLen = GetModuleFileNameA( hModule, _module_filename, sizeof( _module_filename ) );
-    if( sLen == 0 )
-        return FALSE;
-    if( sLen == sizeof( _module_filename ) && GetLastError() == ERROR_INSUFFICIENT_BUFFER )
-        return FALSE;
-    info->dli_fname = _module_filename;
-    return TRUE;
+    dwSize = GetModuleFileNameA( hModule, _module_filename, sizeof( _module_filename ) );
+    if( dwSize > 0 && dwSize < sizeof( _module_filename ) )
+        info->dli_fname = _module_filename;
+    else
+        info->dli_fname = NULL;
 }
 
 DLFCN_EXPORT
 int dladdr( void *addr, Dl_info *info )
 {
-    void *iat_addr = NULL;
-    void *real_addr;
-    HMODULE module;
+    void *iatAddr;
+    void *realAddr;
+    HMODULE hModule;
     IMAGE_IMPORT_DESCRIPTOR *iat;
-    DWORD size = 0;
+    DWORD dwSize;
 
-    if( !info || !addr )
+    if( !addr || !info )
         return 0;
 
-    module = GetModuleHandle( 0 );
-    iat = getImportTable( module, &size );
-    if( iat )
-        iat_addr = getAddressFromIAT( iat, size, addr );
-    real_addr = iat_addr ? iat_addr : addr;
-    if( !getModuleInfo( real_addr, info ))
-    {
-        info->dli_fname = NULL;
-        info->dli_fbase = NULL;
-        info->dli_saddr = NULL;
-    }
-    else
-    {
-        info->dli_saddr = (void*)real_addr;
-        if (iat) {
-            char *sym = getSymbolName( module, iat, real_addr );
-            if (sym) {
-                info->dli_sname = sym;
-                return 1;
-            }
-        }
-    }
-    info->dli_sname = NULL;
+    hModule = GetModuleHandleA( NULL );
+    if( !hModule )
+        return 0;
+
+    iat = getImportTable( hModule, &dwSize );
+    iatAddr = iat ? getAddressFromIAT( iat, dwSize, addr ) : NULL;
+    realAddr = iatAddr ? iatAddr : addr;
+
+    fillModuleInfo( realAddr, info );
+
+    if( !iat && !info->dli_fbase )
+        return 0;
+
+    info->dli_sname = iat ? getSymbolName( hModule, iat, realAddr ) : NULL;
+    info->dli_saddr = (void *) realAddr;
+
     return 1;
 }
 
