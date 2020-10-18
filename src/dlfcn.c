@@ -473,7 +473,7 @@ char *dlerror( void )
 }
 
 /* taken from http://bandido.ch/programming/Import_Address_Table_Hooking.pdf */
-static IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
+static IMAGE_IMPORT_DESCRIPTOR* get_import_table( HMODULE module, DWORD *size )
 {
     IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)module;
     if ( dosHeader->e_magic != 0x5A4D )
@@ -493,7 +493,7 @@ static IMAGE_IMPORT_DESCRIPTOR* getImportTable( HMODULE module, DWORD *size )
 /*
  * return symbol name for a given address
  */
-static char *getSymbolName( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
+static char *get_symbol_name( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
     int i;
     for(i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
@@ -516,7 +516,7 @@ static char *getSymbolName( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void *
  * Return adress from Image Allocation Table (iat), if
  * the original address points to a thunk table entry.
  */
-static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
+static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
 {
     /* check valid pointer */
     MEMORY_BASIC_INFORMATION info;
@@ -562,7 +562,7 @@ static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
 /* holds module filename */
 static char _module_filename[2*MAX_PATH];
 
-static void fillModuleInfo( void *addr, Dl_info *info )
+static void fill_module_info( void *addr, Dl_info *info )
 {
     HMODULE hModule;
     DWORD dwSize;
@@ -599,16 +599,16 @@ int dladdr( void *addr, Dl_info *info )
     if( !hModule )
         return 0;
 
-    iat = getImportTable( hModule, &dwSize );
-    iatAddr = iat ? getAddressFromIAT( iat, dwSize, addr ) : NULL;
+    iat = get_import_table( hModule, &dwSize );
+    iatAddr = iat ? get_address_from_iat( iat, dwSize, addr ) : NULL;
     realAddr = iatAddr ? iatAddr : addr;
 
-    fillModuleInfo( realAddr, info );
+    fill_module_info( realAddr, info );
 
     if( !iat && !info->dli_fbase )
         return 0;
 
-    info->dli_sname = iat ? getSymbolName( hModule, iat, realAddr ) : NULL;
+    info->dli_sname = iat ? get_symbol_name( hModule, iat, realAddr ) : NULL;
     info->dli_saddr = (void *) realAddr;
 
     return 1;
