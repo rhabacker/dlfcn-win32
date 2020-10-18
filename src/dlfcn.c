@@ -567,9 +567,9 @@ static void fill_module_info( void *addr, Dl_info *info )
     HMODULE hModule;
     DWORD dwSize;
 
+    info->dli_fname = NULL;
     if( !GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule ) || !hModule )
     {
-        info->dli_fname = NULL;
         info->dli_fbase = NULL;
         return;
     }
@@ -577,10 +577,16 @@ static void fill_module_info( void *addr, Dl_info *info )
     info->dli_fbase = (void *) hModule;
 
     dwSize = GetModuleFileNameA( hModule, module_filename, sizeof( module_filename ) );
-    if( dwSize > 0 && dwSize < sizeof( module_filename ) )
-        info->dli_fname = module_filename;
-    else
-        info->dli_fname = NULL;
+    if( dwSize == 0 )
+        return;
+    /* Windows XP */
+    if( dwSize == sizeof( module_filename ) && GetLastError() == ERROR_SUCCESS )
+        return;
+    /* > Windows XP */
+    if( dwSize == sizeof( module_filename ) && GetLastError() == ERROR_INSUFFICIENT_BUFFER )
+        return;
+
+    info->dli_fname = module_filename;
 }
 
 DLFCN_EXPORT
