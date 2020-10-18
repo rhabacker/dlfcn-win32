@@ -549,6 +549,11 @@ static void *getAddressFromIAT( void *iat, DWORD iat_size, void *addr )
      */
     void **ptr = (void *)offset;
 #endif
+
+    result = VirtualQuery( ptr, &info, sizeof( info ) );
+    if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 || info.AllocationProtect == PAGE_NOACCESS )
+        return NULL;
+
     if( ptr < (void**)iat || ptr > (void**)iat + iat_size )
         return NULL;
     return *ptr;
