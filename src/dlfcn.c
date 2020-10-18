@@ -498,14 +498,14 @@ static char *get_symbol_name( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void
     int i;
     for(i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
         BYTE *base = (BYTE *)module; /* required to have correct calculations */
-        PIMAGE_THUNK_DATA thunkILT = (PIMAGE_THUNK_DATA)(iid[i].Characteristics + base);
-        PIMAGE_THUNK_DATA thunkIAT = (PIMAGE_THUNK_DATA)(iid[i].FirstThunk + base);
+        IMAGE_THUNK_DATA *thunkILT = (IMAGE_THUNK_DATA*)(iid[i].Characteristics + base);
+        IMAGE_THUNK_DATA *thunkIAT = (IMAGE_THUNK_DATA*)(iid[i].FirstThunk + base);
         for(; thunkILT->u1.AddressOfData != 0; thunkILT++, thunkIAT++) {
             if (IMAGE_SNAP_BY_ORDINAL(thunkILT->u1.Ordinal))
               continue;
             if ((void *)thunkIAT->u1.Function != addr)
               continue;
-            PIMAGE_IMPORT_BY_NAME nameData = (PIMAGE_IMPORT_BY_NAME)(thunkILT->u1.AddressOfData + base);
+            IMAGE_IMPORT_BY_NAME *nameData = (IMAGE_IMPORT_BY_NAME*)(thunkILT->u1.AddressOfData + base);
             return nameData->Name;
         }
    }
