@@ -473,7 +473,7 @@ char *dlerror( void )
 }
 
 /* taken from http://bandido.ch/programming/Import_Address_Table_Hooking.pdf */
-static IMAGE_IMPORT_DESCRIPTOR* get_import_table( HMODULE module, DWORD *size )
+static IMAGE_IMPORT_DESCRIPTOR* get_import_address_table( HMODULE module, DWORD *size )
 {
     IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)module;
     if ( dosHeader->e_magic != 0x5A4D )
@@ -512,37 +512,49 @@ static char *get_symbol_name( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void
    return NULL;
 }
 
-/*
- * Return adress from Image Allocation Table (iat), if
- * the original address points to a thunk table entry.
- */
-static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
+static BOOL is_valid_address( void *addr )
 {
+    if( addr == NULL )
+        return FALSE;
+
     /* check valid pointer */
     MEMORY_BASIC_INFORMATION info;
     SIZE_T result = VirtualQuery( addr, &info, sizeof( info ) );
     if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 || info.AllocationProtect == PAGE_NOACCESS )
-        return NULL;
+        return FALSE;
+    return TRUE;
+}
 
-    /* ...inline app code...
-     * 00401002  |. E8 7B0D0000    CALL 00401D82               ; \GetModuleHandleA
-     * ...thunk table...
-     * 00401D82   $-FF25 4C204000 , JMP DWORD PTR DS:[40204C]  ;  KERNEL32.GetModuleHandleA
-     * ...memory address value of pointer...
-     * 40204C > FC 3D 57 7C   ;little endian pointer value
-     */
+/*
+ * Return state if address points to an import thunk
+ *
+ * An import thunk is setup with a 'jmp' instruction followed by an
+ * absolute address (32bit) or relative offset (64bit) pointing into
+ * the import address table (iat), which is partially maintained by
+ * the runtime linker.
+ */
+static BOOL is_import_thunk( void *addr )
+{
+    return *(short *)addr == 0x25ff ? TRUE : FALSE;
+}
+
+/*
+ * Return adress from the import address table (iat), if
+ * the original address points to a thunk table entry.
+ */
+static void *get_address_from_import_address_table( void *iat, DWORD iat_size, void *addr )
+{
+    if( !is_import_thunk( addr ) )
+        return NULL;
 
     BYTE *thkp = (BYTE*)addr;
-    if( thkp[0] != 0xff || thkp[1] != 0x25 )
-        return NULL;
-
     /* get offset from thunk table (after instruction 0xff 0x25)
      *   4018c8 <_VirtualQuery>: ff 25 4a 8a 00 00
      */
     ULONG offset = *(ULONG*)(thkp + 2);
 #ifdef _WIN64
     /* On 64 bit the offset is relative
-     *   4018c8:	ff 25 4a 8a 00 00    	jmpq   *0x8a4a(%rip)        # 40a318 <__imp_VirtualQuery> # (64bit)
+     *   4018c8:	ff 25 4a 8a 00 00    	jmpq   *0x8a4a(%rip)        # 40a318 <__imp_VirtualQuery>
      */
     void **ptr = (void *)(thkp + 6 + offset);
 #else
@@ -552,8 +564,7 @@ static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
     void **ptr = (void *)offset;
 #endif
 
-    result = VirtualQuery( ptr, &info, sizeof( info ) );
-    if( result == 0 || info.AllocationBase == NULL || info.AllocationProtect == 0 || info.AllocationProtect == PAGE_NOACCESS )
+    if( !is_valid_address( ptr ) )
         return NULL;
 
     if( ptr < (void**)iat || ptr > (void**)iat + iat_size )
@@ -564,7 +575,7 @@ static void *get_address_from_iat( void *iat, DWORD iat_size, void *addr )
 /* holds module filename */
 static char module_filename[2*MAX_PATH];
 
-static void fill_module_info( void *addr, Dl_info *info )
+static BOOL fill_module_info( void *addr, Dl_info *info )
 {
     HMODULE hModule;
     DWORD dwSize;
@@ -573,7 +584,7 @@ static void fill_module_info( void *addr, Dl_info *info )
     if( !GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, addr, &hModule ) || !hModule )
     {
         info->dli_fbase = NULL;
-        return;
+        return FALSE;
     }
 
     info->dli_fbase = (void *) hModule;
@@ -581,19 +592,19 @@ static void fill_module_info( void *addr, Dl_info *info )
     dwSize = GetModuleFileNameA( hModule, module_filename, sizeof( module_filename ) );
 
     if( dwSize == 0 || dwSize == sizeof( module_filename ) )
-        return;
+        return FALSE;
 
     info->dli_fname = module_filename;
+    return TRUE;
 }
 
 DLFCN_EXPORT
 int dladdr( void *addr, Dl_info *info )
 {
-    void *iatAddr;
     void *realAddr;
     HMODULE hModule;
     IMAGE_IMPORT_DESCRIPTOR *iat;
-    DWORD dwSize;
+    DWORD dwSize = 0;
 
     if( !addr || !info )
         return 0;
@@ -602,18 +613,30 @@ int dladdr( void *addr, Dl_info *info )
     if( !hModule )
         return 0;
 
-    iat = get_import_table( hModule, &dwSize );
-    iatAddr = iat ? get_address_from_iat( iat, dwSize, addr ) : NULL;
-    realAddr = iatAddr ? iatAddr : addr;
-
-    fill_module_info( realAddr, info );
-
-    if( !iat && !info->dli_fbase )
+    if( !is_valid_address( addr ) )
         return 0;
 
-    info->dli_sname = iat ? get_symbol_name( hModule, iat, realAddr ) : NULL;
-    info->dli_saddr = (void *) realAddr;
+    realAddr = addr;
+    info->dli_sname = NULL;
 
+    iat = get_import_address_table( hModule, &dwSize );
+
+    if( is_import_thunk( addr ) ) {
+        void *iatAddr;
+
+        iatAddr = get_address_from_import_address_table( iat, dwSize, addr );
+        if( iatAddr == NULL )
+            return 0;
+
+        realAddr = iatAddr;
+    }
+
+    if( !fill_module_info( realAddr, info ) )
+        return 0;
+
+    info->dli_sname = get_symbol_name( hModule, iat, realAddr );
+
+    info->dli_saddr = (void *) realAddr;
     return 1;
 }
 
