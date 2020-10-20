@@ -579,13 +579,8 @@ static void fill_module_info( void *addr, Dl_info *info )
     info->dli_fbase = (void *) hModule;
 
     dwSize = GetModuleFileNameA( hModule, module_filename, sizeof( module_filename ) );
-    if( dwSize == 0 )
-        return;
-    /* Windows XP */
-    if( dwSize == sizeof( module_filename ) && GetLastError() == ERROR_SUCCESS )
-        return;
-    /* > Windows XP */
-    if( dwSize == sizeof( module_filename ) && GetLastError() == ERROR_INSUFFICIENT_BUFFER )
+
+    if( dwSize == 0 || dwSize == sizeof( module_filename ) )
         return;
 
     info->dli_fname = module_filename;
