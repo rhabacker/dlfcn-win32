@@ -11,6 +11,7 @@ static int verbose = 0;
 typedef enum {
     Pass = 1,
     PassWithoutSymbol = 2,
+    PassWithDifferentAddress = 3,
     Fail = 0,
     NoInfo = -1,
 } ExpectedResult;
@@ -37,7 +38,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
     int passed = 0;
     if (!result)
     {
-        passed = expected_result == NoInfo;
+        passed = expected_result == NoInfo || expected_result == Fail;
         printf( "check address %p which has symbol '%s' -> %s\n", addr, addrsym, passed ? "passed" : "failed" );
         if (verbose)
             fprintf( stderr,"could not get symbol information for address %p\n", addr );
@@ -49,6 +50,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
         int addr_match  = addr == info.dli_saddr;
         passed = (expected_result == Pass && sym_match && addr_match)
                  || (expected_result == PassWithoutSymbol && addr_match)
+                 || (expected_result == PassWithDifferentAddress && sym_match)
                  || (expected_result == Fail && !(sym_match && addr_match));
         printf( "check address %p with has symbol '%s' -> %s\n",addr, addrsym, passed ? "passed" : "failed" );
         if (verbose)
@@ -151,9 +153,9 @@ int main(int argc, char **argv)
 
 #ifdef _WIN32
     /* last entry in iat */
-    result |= check_dladdr( (char*)VirtualQuery, "VirtualQuery", Pass );
+    result |= check_dladdr( (char*)VirtualQuery, "VirtualQuery", PassWithDifferentAddress );
     /* links to import thunk table */
-    result |= check_dladdr ( (void*)GetModuleHandleA, "GetModuleHandleA", Pass );
+    result |= check_dladdr ( (void*)GetModuleHandleA, "GetModuleHandleA", PassWithDifferentAddress );
     result |= check_dladdr_by_dlopen( "kernel32.dll", "GetModuleHandleA", Pass );
 
     /* links directly to Import allocation table */
