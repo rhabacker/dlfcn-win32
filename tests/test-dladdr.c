@@ -52,7 +52,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
                  || (expected_result == PassWithoutSymbol && addr_match)
                  || (expected_result == PassWithDifferentAddress && sym_match)
                  || (expected_result == Fail && !(sym_match && addr_match));
-        printf( "check address %p with has symbol '%s' -> %s\n",addr, addrsym, passed ? "passed" : "failed" );
+        printf( "check address %p with has symbol '%s' -> %s%s",addr, addrsym, passed ? "passed" : "failed", verbose ? " " : "\n" );
         if (verbose)
             print_dl_info( &info );
         return !passed;
