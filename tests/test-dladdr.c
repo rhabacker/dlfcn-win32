@@ -1,3 +1,5 @@
+/* On Unix like os compile with "-Wl,--export-dynamic -fpie" (default with cmake) */
+
 /* required for non Windows builds, must be set in front of the first system include */
 #define _GNU_SOURCE
 

@@ -14,4 +14,7 @@ endif()
 
 add_executable(test-dladdr test-dladdr.c)
 target_link_libraries(test-dladdr dl)
+if(UNIX)
+    set_target_properties(test-dladdr PROPERTIES COMPILE_FLAGS "-Wl,--export-dynamic -fpie")
+endif()
 add_test (NAME test-dladdr COMMAND test-dladdr)
