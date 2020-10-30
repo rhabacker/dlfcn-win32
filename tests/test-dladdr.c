@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int verbose = 0;
@@ -135,7 +136,7 @@ int main(int argc, char **argv)
     /* -ldl */
     result |= check_dladdr( (void*)dlopen, "dlopen", Pass );
     /* -lglibc */
-    result |= check_dladdr( (void*)vsnprintf, "vsnprintf", PassWithoutSymbolOnWin );
+    result |= check_dladdr( (void*)atoi, "atoi", Pass );
     /* test-dladdr */
     result |= check_dladdr( (void*)main, "main", PassWithoutSymbolOnWin );
     /* offsets */
