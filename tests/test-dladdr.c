@@ -18,9 +18,9 @@ typedef enum {
 
 typedef void (* func) (void);
 
-void print_dl_info(Dl_info *info)
+static void print_dl_info( Dl_info *info, char *prefix, char *suffix )
 {
-    printf("filename: %s base: %p symbol name: '%s' addr: %p\n", info->dli_fname, info->dli_fbase, info->dli_sname, info->dli_saddr);
+    printf( "%sfilename: %s base: %p symbol name: '%s' addr: %p%s", prefix, info->dli_fname, info->dli_fbase, info->dli_sname, info->dli_saddr, suffix );
 }
 
 /**
@@ -54,7 +54,7 @@ int check_dladdr( void *addr, char *addrsym, ExpectedResult expected_result )
                  || (expected_result == Fail && !(sym_match && addr_match));
         printf( "check address %p with has symbol '%s' -> %s%s",addr, addrsym, passed ? "passed" : "failed", verbose ? " " : "\n" );
         if (verbose)
-            print_dl_info( &info );
+            print_dl_info( &info, "(", ")\n");
         return !passed;
     }
 }
