@@ -490,10 +490,27 @@ static IMAGE_IMPORT_DESCRIPTOR* get_import_address_table( HMODULE module, DWORD 
         optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 }
 
+static IMAGE_EXPORT_DIRECTORY* get_export_address_table( HMODULE module, DWORD *size )
+{
+    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)module;
+    if ( dosHeader->e_magic != 0x5A4D )
+        return NULL;
+    IMAGE_OPTIONAL_HEADER* optionalHeader = (IMAGE_OPTIONAL_HEADER*)
+        ((BYTE*)module + dosHeader->e_lfanew + 24);
+    if ( optionalHeader->Magic != IMAGE_NT_OPTIONAL_HDR_MAGIC )
+        return NULL;
+    if ( optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size == 0 ||
+        optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0 )
+        return NULL;
+    *size = optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+    return (IMAGE_EXPORT_DIRECTORY*)((BYTE*)module +
+        optionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+}
+
 /*
  * return symbol name for a given address
  */
-static char *get_symbol_name( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
+static char *get_symbol_name_from_import_address_table( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void *addr )
 {
     int i;
     for(i = 0; iid[i].Characteristics != 0 && iid[i].FirstThunk != 0; i++) {
@@ -507,6 +524,42 @@ static char *get_symbol_name( HMODULE module, IMAGE_IMPORT_DESCRIPTOR *iid, void
               continue;
             IMAGE_IMPORT_BY_NAME *nameData = (IMAGE_IMPORT_BY_NAME*)(thunkILT->u1.AddressOfData + base);
             return nameData->Name;
+        }
+   }
+   return NULL;
+}
+BOOL is_forwarder_rva( DWORD export_rva )
+{
+    return FALSE;
+}
+
+/*
+ * return symbol name for a given address
+ */
+char *get_symbol_name_from_export_address_table( HMODULE module, IMAGE_EXPORT_DIRECTORY *ied, void *addr )
+{
+    BYTE *base = (BYTE *)module; /* required to have correct calculations */
+    DWORD i;
+    DWORD *funcs = (DWORD*)(ied->AddressOfFunctions + base);
+    DWORD *names = (DWORD*)(ied->AddressOfNames + base);
+    fprintf(stderr, "funcs %p names %p\n", funcs, names);
+    for(i = 0; i < ied->NumberOfFunctions; i++) {
+        DWORD export_rva = funcs[i];
+        /**
+         * If the address specified is not within the export section
+         * (as defined by the address and length that are indicated in the optional header),
+         * the field is an export RVA, which is an actual address in code or data.
+         * Otherwise, the field is a forwarder RVA, which names a symbol in another DLL.
+         * https://docs.microsoft.com/en-us/windows/win32/debug/pe-format
+         * /
+        void *p = (void*)(funcs[i] + base);
+
+        char *sym = (void*)(names[i] + base);
+        fprintf(stderr, "func %08lx name %08lx %p %s\n", funcs[i], names[i], p, sym);
+        if( is_forwarder_rva(export_rva) ) {
+           // TODO: special care must be taken here - we cannot resolve directly to a VA unless target module is memory mapped
+        } else if (p == addr){
+            return sym;
         }
    }
    return NULL;
@@ -629,14 +682,29 @@ int dladdr( void *addr, Dl_info *info )
             return 0;
 
         realAddr = iatAddr;
+        if( !fill_module_info( realAddr, info ) )
+            return 0;
+
+        info->dli_sname = get_symbol_name_from_import_address_table( hModule, iat, realAddr );
+
+        info->dli_saddr = (void *) realAddr;
+    } else {
+        IMAGE_EXPORT_DIRECTORY *iet;
+
+        if( !fill_module_info( realAddr, info ) )
+            return 0;
+
+        iet = get_export_address_table( hModule, &dwSize );
+        fprintf(stderr, "iet %p\n", iet);
+        if( iet ) {
+            char *name = get_symbol_name_from_export_address_table( hModule, iet, addr );
+            fprintf(stderr, "name from iet %s\n", name);
+            if( name )
+                info->dli_sname = name;
+        }
+        info->dli_saddr = (void *) realAddr;
     }
 
-    if( !fill_module_info( realAddr, info ) )
-        return 0;
-
-    info->dli_sname = get_symbol_name( hModule, iat, realAddr );
-
-    info->dli_saddr = (void *) realAddr;
     return 1;
 }
 

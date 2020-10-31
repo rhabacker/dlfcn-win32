@@ -17,4 +17,8 @@ target_link_libraries(test-dladdr dl)
 if(UNIX)
     set_target_properties(test-dladdr PROPERTIES COMPILE_FLAGS "-Wl,--export-dynamic -fpie")
 endif()
+if(WIN32)
+    set_target_properties(test-dladdr PROPERTIES LINK_FLAGS "-Wl,--export-all-symbols")
+endif()
+
 add_test (NAME test-dladdr COMMAND test-dladdr)
