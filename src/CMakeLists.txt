@@ -1,21 +1,29 @@
 set(headers dlfcn.h)
 set(sources dlfcn.c)
 
-if (BUILD_SHARED_LIBS)
-  add_definitions(-DSHARED)
-endif (BUILD_SHARED_LIBS)
+if(BUILD_SHARED_LIBS)
+    add_library(dl ${sources})
+    target_compile_options(dl PRIVATE -DSHARED)
+    # Correctly export the location of installed includes in the target
+    target_include_directories(dl INTERFACE $<INSTALL_INTERFACE:include>)
 
-add_library(dl ${sources})
-
-# Correctly export the location of installed includes in the target
-target_include_directories(dl INTERFACE $<INSTALL_INTERFACE:include>)
-
-install (TARGETS dl EXPORT dlfcn-win32-targets
-                    RUNTIME DESTINATION bin
-                    LIBRARY DESTINATION lib${LIB_SUFFIX}
-                    ARCHIVE DESTINATION lib${LIB_SUFFIX})
-
+    install (TARGETS dl EXPORT dlfcn-win32-targets
+                        RUNTIME DESTINATION bin
+                        LIBRARY DESTINATION lib${LIB_SUFFIX}
+                        ARCHIVE DESTINATION lib${LIB_SUFFIX})
+endif()
 install (FILES ${headers} DESTINATION include)
+
+if(ENABLE_STATIC)
+    add_library(dl_static STATIC ${sources})
+    set_target_properties(dl_static PROPERTIES OUTPUT_NAME dl)
+    target_include_directories(dl_static INTERFACE $<INSTALL_INTERFACE:include>)
+
+    install (TARGETS dl_static EXPORT dlfcn-win32-targets
+                        RUNTIME DESTINATION bin
+                        LIBRARY DESTINATION lib${LIB_SUFFIX}
+                        ARCHIVE DESTINATION lib${LIB_SUFFIX})
+endif()
 
 # Export the targets  (build tree)
 export(EXPORT dlfcn-win32-targets
